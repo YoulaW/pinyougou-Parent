@@ -35,10 +35,10 @@
   	<servlet-name>springmvc</servlet-name>
   	<url-pattern>*.do</url-pattern>
   </servlet-mapping>
-	<!-- 监听器 -->
+	<!-- 监听器 同时加载common中的application文件 故配置为*.xml -->
 	<context-param>
 		<param-name>contextConfigLocation</param-name>
-		<param-value>classpath:spring/spring-security.xml</param-value>
+		<param-value>classpath*:spring/*.xml</param-value>
 	</context-param>
 	<listener>
 		<listener-class>

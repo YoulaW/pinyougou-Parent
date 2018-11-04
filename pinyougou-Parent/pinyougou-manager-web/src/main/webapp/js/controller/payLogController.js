@@ -16,8 +16,8 @@ app.controller('payLogController' ,function($scope,$controller   ,payLogService)
 	$scope.findPage=function(page,rows){			
 		payLogService.findPage(page,rows).success(
 			function(response){
-				$scope.list=response.rows;	
-				$scope.paginationConf.totalItems=response.total;//更新总记录数
+                $scope.list=response.rowMessage;
+                $scope.paginationConf.totalItems=response.totalPage;//更新总记录数
 			}			
 		);
 	}
@@ -71,8 +71,8 @@ app.controller('payLogController' ,function($scope,$controller   ,payLogService)
 	$scope.search=function(page,rows){			
 		payLogService.search(page,rows,$scope.searchEntity).success(
 			function(response){
-				$scope.list=response.rows;	
-				$scope.paginationConf.totalItems=response.total;//更新总记录数
+                $scope.list=response.rowMessage;
+                $scope.paginationConf.totalItems=response.totalPage;//更新总记录数
 			}			
 		);
 	}

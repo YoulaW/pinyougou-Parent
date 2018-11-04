@@ -1,5 +1,5 @@
  //控制层 
-app.controller('itemPageController' ,function($scope){	
+app.controller('itemPageController' ,function($scope,$http){
 	
 	//购买数量的计算
 	$scope.num=1;
@@ -70,7 +70,22 @@ app.controller('itemPageController' ,function($scope){
 	
 	//加载到购物车
 	$scope.addToCat=function(){
-		alert('skuid'+$scope.sku.id);
+		//alert('skuid'+$scope.sku.id);
+		//跳到购物车 的addGoodsCart中  成功后跳转到cart.html购物车页面
+		//失败弹框
+		//{'withCredentials':true} 为了解决跨域问题  必须要携带访问
+		$http.get('http://localhost:9107/cart/addGoodsToCartList.do?itemId='+$scope.sku.id+
+			'&num='+$scope.num,{'withCredentials':true}).success(
+			function (response) {
+				if(response.message){//成功跳转到cart.html
+					location.href="http://localhost:9107/cart.html";
+				}else {
+					alert(response.message);
+				}
+            }
+		)
+
+
 	}
 	
 	

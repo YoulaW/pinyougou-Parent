@@ -1,11 +1,17 @@
 package com.pinyougou.manager.controller;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
-import com.pinyougou.page.service.ItemPageService;
+import com.alibaba.fastjson.JSON;
+//import com.pinyougou.page.service.ItemPageService;
 import com.pinyougou.pojo.TbItem;
-import com.pinyougou.search.service.ItemSearchService;
+//import com.pinyougou.search.service.ItemSearchService;
 import domain.Goods;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.jms.core.MessageCreator;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,6 +21,12 @@ import com.pinyougou.sellergoods.service.GoodsService;
 
 import entity.PageResult;
 import entity.Result;
+
+import javax.jms.Destination;
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.Session;
+
 /**
  * controller
  * @author Administrator
@@ -26,8 +38,22 @@ public class GoodsController {
 
 	@Reference
 	private GoodsService goodsService;
-	@Reference
-	private ItemSearchService itemSearchService;
+//	@Reference
+//	private ItemSearchService itemSearchService;
+
+	@Autowired
+	private Destination queueSolrDestination;//队列  用于发送solr 删除solr
+
+	@Autowired
+	private JmsTemplate jmsTemplate;//jms模板操作activeMQ
+
+	@Autowired
+	private Destination queueSolrDeleteDestination;//用户在索引库中删除记录
+	@Autowired
+	private Destination topicPageDestination;//页面生成  topic
+
+	@Autowired
+	private Destination topicPageDeleteDestination;//用于将页面删除
 
 	/**
 	 * 返回全部列表
@@ -96,13 +122,34 @@ public class GoodsController {
 	 * @return
 	 */
 	@RequestMapping("/delete")
-	public Result delete(Long [] ids){
+	public Result delete(final Long [] ids){
 		try {
-			goodsService.delete(ids);
+			//goodsService.delete(ids);   最后删除  商品
 			//删除的同时  根据goodsId 删除 solr索引库中信息
-			itemSearchService.deleteSolr(Arrays.asList(ids));
+//			itemSearchService.deleteSolr(Arrays.asList(ids));  改为activeMq  消息中间件
+			jmsTemplate.send(queueSolrDeleteDestination, new MessageCreator() {
+				@Override
+				public Message createMessage(Session session) throws JMSException {
+					//必须实现 Serializable
+					HashMap map =new HashMap();
+					map.put("ids",ids);
+					return session.createObjectMessage(map);
+				}
+			});
 
-			return new Result(true, "删除成功"); 
+			//删除索引的同时  删除页面
+			jmsTemplate.send(topicPageDeleteDestination, new MessageCreator() {
+				@Override
+				public Message createMessage(Session session) throws JMSException {
+					return session.createObjectMessage(ids);
+				}
+			});
+
+
+
+			goodsService.delete(ids);
+
+			return new Result(true, "删除成功");
 		} catch (Exception e) {
 			e.printStackTrace();
 			return new Result(false, "删除失败");
@@ -134,14 +181,31 @@ public class GoodsController {
 			if ("1".equals(status)){
 				List<TbItem> tbItems = goodsService.findItemByGoodsIdAndStatus(ids, status);
 				if (tbItems.size()>0){
-					itemSearchService.updateSolr(tbItems);
+//					itemSearchService.updateSolr(tbItems);改为activeMq  消息中间件  将tbTems集合通过消息中间件的 生产者传输
+					// 因传输 有对象  文本 map  此处选择本文  通过JSON转为字符串传递
+					final String jsonString = JSON.toJSONString(tbItems);
+					//通过JmsTemplate 生产消息
+					jmsTemplate.send(queueSolrDestination, new MessageCreator(){
+                        @Override
+                        public Message createMessage(Session session) throws JMSException {
+                            return session.createTextMessage(jsonString);
+                        }
+                    });
+
 				}else {
 					System.out.println("无明细");
 				}
 
 				//同时生 成静态页面
-				for (Long id : ids) {
-					getHtml(id);
+				for (final Long id : ids) {
+				//	getHtml(id); 用active MQ替代
+
+					jmsTemplate.send(topicPageDestination, new MessageCreator() {
+						@Override
+						public Message createMessage(Session session) throws JMSException {
+							return session.createTextMessage(id+"");
+						}
+					});
 				}
 
 
@@ -154,18 +218,23 @@ public class GoodsController {
 	}
 
 
-	@Reference
-	private ItemPageService itemPageService;
+//	@Reference
+//	private ItemPageService itemPageService;  用activeMq替换
 
 	/**
 	 * 在商品审核状态改变的时候调用 如下方法
 	 * 根据商品ID生成商品详情的静态页面  通过freeMarker
 	 * @param goodsId
 	 */
-	@RequestMapping("/getHtml")
-	public void getHtml(Long goodsId){
-		itemPageService.genItemHtml(goodsId);
-	}
+//	@RequestMapping("/getHtml")
+//	public void getHtml(Long goodsId){
+//		//itemPageService.genItemHtml(goodsId);
+//
+////		topicPageDestination
+//
+//
+//
+//	}
 
 
 }

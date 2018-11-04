@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @author Administrator
  *
  */
-@Service
+@Service(timeout = 50000)
 @Transactional
 public class GoodsServiceImpl implements GoodsService {
 
